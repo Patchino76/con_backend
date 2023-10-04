@@ -1,10 +1,9 @@
-import { useEffect, useRef, useState } from "react";
-import apiClient, {CanceledError} from "./services/api-client";
+import { useEffect, useState } from "react";
+import {CanceledError} from "./services/api-client";
+import userService,  { User } from "./services/user-service";
 
-interface User {
-  id: number;
-  name: string;
-}
+
+// const endpoint = "https://jsonplaceholder.typicode.com";
 
 function App() {
   const [users, setUsers] = useState<User[]>([]);
@@ -12,13 +11,9 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    const controller = new AbortController();
     setIsLoading(true);
-    apiClient
-      .get("/users/", {
-        signal: controller.signal,
-      })
-      .then((res) => {
+    const {request, cancel} = userService.getAll<User>();
+      request.then((res) => {
         setUsers(res.data);
         setIsLoading(false);
       })
@@ -27,40 +22,38 @@ function App() {
         setError(err.message);
         setIsLoading(false);
       });
-    return () => controller.abort();
+    return () => cancel();
   }, []);
 
-  const deleteUser = (user: User) => {
+
+  const deleteUser = (user: User) =>{
     const originalUsers = [...users];
     setUsers(users.filter((u) => u.id !== user.id));
-    apiClient
-      .delete(`/users/${user.id}`)
-      .catch((err) => {
-        setError(err.message);
-        setUsers(originalUsers);
-      });
-  };
+    const request = userService.delete(user.id);
+    request.catch((err) => {
+      setError(err.message);
+      setUsers(originalUsers);
+    })
+  }
 
   const addUser = () => {
     const newUser = { id: 0, name: "Svetlio" };
     const originalUsers = [...users];
     setUsers([...users, newUser]);
-    apiClient
-      .post("https://jsonplaceholder.typicode.com/users", newUser)
-      .then(({ data: savedUser }) => setUsers([...users, savedUser]))
-      .catch((err) => {
-        setError(err.message);
-        setUsers([...originalUsers]);
-      });
+    const request = userService.create(newUser);
+    request.then(({ data: savedUser }) => setUsers([...users, savedUser]))
+    .catch((err) => {
+      setError(err.message);
+      setUsers([...originalUsers]);
+    });
   };
 
   const updateUser = (user: User) => {
     const updatedUser = {...user, name: user.name + " !!!"};
     const originalUsers = [...users];
     setUsers(users.map((u) => u.id === user.id ? updatedUser : u));
-    apiClient
-      .put(`/users/${user.id}`, updatedUser)
-      .catch((err) => {
+      const request = userService.update(updatedUser);
+      request.catch((err) => {
         setError(err.message);
         setUsers(originalUsers);
       });
